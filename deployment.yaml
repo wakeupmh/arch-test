@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-microservice
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: data-microservice
+  template:
+    metadata:
+      labels:
+        app: data-microservice
+    spec:
+      containers:
+      - name: microservice
+        image: REPOSITORY_URI:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: microservice-config
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: microservice-config
+              key: REDIS_URL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: data-microservice-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: data-microservice
+  ports:
+    - port: 80
+      targetPort: 8080
+
+---
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: data-microservice-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: data-microservice
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      targetAverageUtilization: 70
